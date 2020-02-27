@@ -15,7 +15,7 @@ import IncomingMessageStream from './incoming-message-stream';
 import OutgoingMessageStream from './outgoing-message-stream';
 
 class MessageIO extends EventEmitter {
-  socket: Socket;
+  socket: Duplex;
   debug: Debug;
 
   tlsNegotiationComplete: boolean;
@@ -28,7 +28,7 @@ class MessageIO extends EventEmitter {
     encrypted: Duplex;
   }
 
-  constructor(socket: Socket, packetSize: number, debug: Debug) {
+  constructor(socket: Duplex, packetSize: number, debug: Debug) {
     super();
 
     this.socket = socket;

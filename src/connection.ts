@@ -44,6 +44,8 @@ import { createNTLMRequest } from './ntlm';
 import { ColumnMetadata } from './token/colmetadata-token-parser';
 
 import depd from 'depd';
+import {Duplex} from "stream";
+import * as stream from "stream";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const deprecate = depd('tedious');
@@ -175,6 +177,7 @@ export interface InternalConnectionOptions {
   requestTimeout: number;
   rowCollectionOnDone: boolean;
   rowCollectionOnRequestCompletion: boolean;
+  socketStreamFactory: null | (() => stream.Duplex);
   tdsVersion: string;
   textsize: string;
   trustServerCertificate: boolean;
@@ -256,6 +259,7 @@ interface ConnectionOptions {
   requestTimeout?: number;
   rowCollectionOnDone?: boolean;
   rowCollectionOnRequestCompletion?: boolean;
+  socketStreamFactory?: () => stream.Duplex;
   tdsVersion?: string;
   textsize?: string;
   trustServerCertificate?: boolean;
@@ -313,7 +317,7 @@ class Connection extends EventEmitter {
 
   request: undefined | Request | BulkLoad;
   procReturnStatusValue: undefined | any;
-  socket: undefined | Socket;
+  socket: undefined | Duplex;
   messageBuffer: Buffer;
 
   connectTimer: undefined | NodeJS.Timeout;
@@ -535,6 +539,7 @@ class Connection extends EventEmitter {
         requestTimeout: DEFAULT_CLIENT_REQUEST_TIMEOUT,
         rowCollectionOnDone: false,
         rowCollectionOnRequestCompletion: false,
+        socketStreamFactory: null,
         tdsVersion: DEFAULT_TDS_VERSION,
         textsize: DEFAULT_TEXTSIZE,
         trustServerCertificate: true,
@@ -940,6 +945,10 @@ class Connection extends EventEmitter {
 
         this.config.options.lowerCaseGuids = config.options.lowerCaseGuids;
       }
+
+      if (config.options.socketStreamFactory !== undefined) {
+        this.config.options.socketStreamFactory = config.options.socketStreamFactory;
+      }
     }
 
     let credentialsDetails = this.config.options.cryptoCredentialsDetails;
@@ -1324,7 +1333,8 @@ class Connection extends EventEmitter {
     const connectOpts = {
       host: this.routingData ? this.routingData.server : this.config.server,
       port: this.routingData ? this.routingData.port : port,
-      localAddress: this.config.options.localAddress
+      localAddress: this.config.options.localAddress,
+      socketStreamFactory: this.config.options.socketStreamFactory
     };
 
     new Connector(connectOpts, multiSubnetFailover).execute((err, socket) => {
@@ -1340,7 +1350,9 @@ class Connection extends EventEmitter {
       socket!.on('error', (error) => { this.socketError(error); });
       socket!.on('close', () => { this.socketClose(); });
       socket!.on('end', () => { this.socketEnd(); });
-      socket!.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY);
+      if (socket! instanceof Socket) {
+        socket!.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY);
+      }
 
       this.messageIo = new MessageIO(socket!, this.config.options.packetSize, this.debug);
       this.messageIo.on('data', (data) => { this.dispatchEvent('data', data); });
