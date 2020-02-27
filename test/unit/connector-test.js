@@ -23,7 +23,7 @@ function connectToIpTestImpl(hostIp, localIp, mitm, done) {
   mitm.once('connect', function(socket, options) {
     expectedSocket = socket;
 
-    assert.strictEqual(options, connectionOptions);
+    assert.deepEqual(options, connectionOptions);
   });
 
   connector.execute(function(err, socket) {
@@ -103,7 +103,7 @@ describe('connector tests', function() {
       mitm.once('connect', function(socket, options) {
         expectedSocket = socket;
 
-        assert.strictEqual(options, connectionOptions);
+        assert.deepEqual(options, connectionOptions);
       });
 
       connector.execute(function(err, socket) {
